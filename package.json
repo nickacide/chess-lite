@@ -1,0 +1,27 @@
+{
+  "name": "chesslite",
+  "version": "0.0.1",
+  "description": "A simple, lightweight chess implementation to be reused in the future.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickacide/chess-lite.git"
+  },
+  "keywords": [
+    "chess",
+    "simple",
+    "lightweight",
+    "implementation",
+    "nickacide",
+    "whyareyoureadingthis"
+  ],
+  "author": "Nickacide",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nickacide/chess-lite/issues"
+  },
+  "homepage": "https://github.com/nickacide/chess-lite#readme"
+}
