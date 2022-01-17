@@ -1,9 +1,11 @@
-//engine.js will not (should not) require any references from index.js and vice versa. There should be no correlation between the two apart from index referencing the necessary functions in engine.
+//engine.js should not and will not require any references from index.js and vice versa. There should be no correlation between the two apart from index referencing the necessary functions in engine.
 //I will be reusing some of the code from my other repository where needed (https://github.com/nickacide/chess-engine/blob/latest/engine.js)
 
 const STARTING_FEN = `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`;
 const WHITE = 'w';
 const BLACK = 'b';
+
+//TODO: Remove excessive functionality, implement MiniMax algorithm (hopefully with some optimizations) and logical bug fixes.
 
 /*
     I will be taking a different approach that I have seen on YouTube: 
@@ -12,17 +14,12 @@ const BLACK = 'b';
     This applies for every piece, justifying the implementation's necessity. The second file/row is for knights. 
     Technically, we only need 1 layer on each side, but I will look into that in the future; let's just get the engine working.
 */
-// let board12 = []; //Array(144) ie 12x12
-// let board8 = []; //Array(64) ie 8x8 (inner board that you will see)
 const indexOnBoard = index => {
     index -= 26;
     if (index >= 0 && index <= 91 && index % 12 < 8) return true;
     return false;
 }
 const inRange = index => index >= 0 && index < 64 ? true : false;
-// for (i = 0; i < 64; i++) {
-//     board8.push('');
-// }
 const toIndex8 = pIndex => {
     pIndex -= 26;
     return pIndex - Math.floor(pIndex / 12) * 4;
@@ -34,15 +31,8 @@ const toBoard8 = board => {
     });
     return board8;
 }
-/* 
-    When I use board instead of fen as a paramater it means that we should only 
-    calculate board once and then continuosly reuse it.
-
-*/
 const pieceColor = (board, pIndex) => {
-    // if (!inRange(pIndex)) return null;
     const piece = board[pIndex];
-    // console.log(piece);
     if (piece === ' ' || piece === '_') return null;
     if (piece == piece.toUpperCase()) return WHITE;
     return BLACK;
@@ -61,14 +51,25 @@ const verifyFEN = fen => {
     const check = inCheck(fromFEN(fen));
     if (check == null) return false;
     if (check) if (move !== check) return false;
+    let formatted = formatFEN(fen);
+    let chars = 0;
+    for (const char of formatted.split(' ')[0] + '/') {
+        if (char == '/') {
+            if (chars !== 8) return false;
+            chars = 0;
+        }
+        else if (isPiece(char)) { chars++ }
+        else if (parseInt(char)) { chars += parseInt(char) }
+        else return false;
+    }
     return true;
 }
 const inCheck = board => {
-    const { wSpace, bSpace } = spaceControl(board);
+    const { wSpace, bSpace } = pseudoLegalMoves(board);
     const check = [];
     if (wSpace.includes(board.indexOf('k'))) check.push(BLACK);
-    else if (bSpace.includes(board.indexOf('K'))) check.push(WHITE)
-    if (check.length === 2) return null; //if null, malformed FEN
+    if (bSpace.includes(board.indexOf('K'))) check.push(WHITE);
+    if (check.length === 2) return null;
     if (check.length === 0) return false;
     return check[0];
 }
@@ -88,20 +89,11 @@ const fromFEN = fen => {
                 board[pointer] = ' ';
                 pointer++;
             }
-            // pointer--;
         } else if (piece.match(/[KQBNRP]/gi)) {
             board[pointer] = piece;
             pointer++;
         }
-        // console.log(piece, pointer);
     };
-    // for (const square of board) {
-    //     if (square == '') {
-
-    //     }
-    // }
-
-    // if (board.length !== 144) return null;
     return board;
 }
 const formatFEN = fen => {
@@ -110,8 +102,6 @@ const formatFEN = fen => {
     const position = fen.split(' ')[0];
     for (const char of position) {
         if (typeof parseInt(char) == 'number' && parseInt(char) > 0 && parseInt(char) <= 9) {
-            // let e = (parseInt(char)); 
-            // console.log(e)            
             currentTotal += parseInt(char);
         } else {
             if (currentTotal !== 0) newFEN += currentTotal;
@@ -123,20 +113,26 @@ const formatFEN = fen => {
     newFEN += fen.slice(fen.indexOf(' '), fen.length)
     return newFEN;
 }
-let formatted = formatFEN('11111111/2321/8/8/2r5/1r1R4/2P5/8 w - - 0 1');
-// console.log(formatted)
-// let myBoard = fromFEN(STARTING_FEN);
-// console.log(myBoard[117]);
-// myBoard.map((e,i)=>console.log(i + ': ' + e));
+const pieceLocations = (board, color) => {
+    const pieces = [];
+    board.forEach((square, sIndex) => {
+        if (!isPiece(square)) return;
+        if (color == BLACK && square == square.toUpperCase()) return;
+        if (color == WHITE && square == square.toLowerCase()) return;
+        pieces.push(sIndex);
+    });
+    return pieces;
+}
 const pieceMoves = (board, pIndex) => {
     const piece = board[pIndex];
     const pMoves = [];
     switch (piece.toLowerCase()) {
         case "p": {
+            //TODO: add more information to pawn movement in pieceMoves function. At the moment, a pawn move is seen as a "capture" by our function.
             const pColor = pieceColor(board, pIndex);
             const captures = pColor == WHITE ? [-13, -11] : [11, 13];
             const moves = pColor == WHITE ? [-12, -24] : [12, 24];
-            if (!(pColor == WHITE && pIndex > 97 && pIndex < 106) || !(pColor == BLACK && pIndex > 37 && pIndex < 46)) moves.pop();
+            if ((pColor == WHITE && !(pIndex > 97 && pIndex < 106)) || (pColor == BLACK && !(pIndex > 37 && pIndex < 46))) moves.pop();
             captures.map(capture => {
                 let cIndex = pIndex + capture;
                 if (board[cIndex] !== ' ') {
@@ -218,21 +214,46 @@ const pieceMoves = (board, pIndex) => {
             break;
         }
     }
-    return [...new Set(pMoves)].sort();
+    return [...new Set(pMoves)].filter(move => indexOnBoard(move));
 }
-const spaceControl = (board) => {
+//Check still needs to be implemented correctly, WIP
+const pseudoLegalMoves = (board) => {
     const wSpace = [];
     const bSpace = [];
-    board.map((piece, pIndex) => { //should be (square, sIndex) but we filter out the squares with no pieces on them.
+    board.map((piece, pIndex) => {
         if (isPiece(piece)) {
             const pMoves = pieceMoves(board, pIndex);
-            // console.log(piece, pMoves);
             pieceColor(board, pIndex) == WHITE ? wSpace.push(...pMoves) : bSpace.push(...pMoves);
         }
     });
     return {
         wSpace,
-        bSpace
+        bSpace,
     }
 }
-// console.log(spaceControl(fromFEN('3q2k1/5pb1/1pp3p1/pb1p3p/3P1Q1P/P1P1N1PB/1P3P2/6K1 w - - 8 35')));
+
+//Idea: create your own evaluation function!
+const MaxFunction = (moves, depth) => {
+    if (depth == 0) {
+        let val = evaluate(); // TODO: Pass arguments to evaluation function.
+        return val;
+    };
+    let max = -Infinity;
+    for (const move of moves) {
+        //TODO: Function that applies a move to a given board position
+        let score = MinFunction(moves, depth - 1);
+        if (score > max) {
+            max = score;
+        }
+    }
+}
+const MinFunction = (moves, depth) => {
+    if (depth == 0) return -evaluate();
+    let min = Infinity;
+    for (const move of moves) {
+        let score = MaxFunction(moves, depth - 1);
+        if (score < min) {
+            min = score;
+        }
+    }
+}
