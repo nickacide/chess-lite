@@ -65,7 +65,7 @@ const verifyFEN = fen => {
     return true;
 }
 const inCheck = board => {
-    const { wSpace, bSpace } = pseudoLegalMoves(board);
+    const { wSpace, bSpace } = spaceControl(board);
     const check = [];
     if (wSpace.includes(board.indexOf('k'))) check.push(BLACK);
     if (bSpace.includes(board.indexOf('K'))) check.push(WHITE);
@@ -123,9 +123,10 @@ const pieceLocations = (board, color) => {
     });
     return pieces;
 }
-const pieceMoves = (board, pIndex) => {
+const pieceMoves = (board, pIndex, options = { space: false }) => {
     const piece = board[pIndex];
     const pMoves = [];
+    const { space } = options;
     switch (piece.toLowerCase()) {
         case "p": {
             //TODO: add more information to pawn movement in pieceMoves function. At the moment, a pawn move is seen as a "capture" by our function.
@@ -135,12 +136,14 @@ const pieceMoves = (board, pIndex) => {
             if ((pColor == WHITE && !(pIndex > 97 && pIndex < 106)) || (pColor == BLACK && !(pIndex > 37 && pIndex < 46))) moves.pop();
             captures.map(capture => {
                 let cIndex = pIndex + capture;
+                if (space) return pMoves.push(cIndex);
                 if (board[cIndex] !== ' ') {
                     if (pieceColor(board, cIndex) === pColor) return;
                     return pMoves.push(cIndex);
                 }
             });
             moves.map(move => {
+                if (space) return;
                 let mIndex = pIndex + move;
                 if (board[mIndex] !== ' ') return;
                 return pMoves.push(mIndex);
@@ -149,8 +152,8 @@ const pieceMoves = (board, pIndex) => {
         } case "n": {
             [14, -14, 10, -10, 25, -25, 23, -23].map(move => {
                 let newIndex = pIndex + move;
+                if (space) return pMoves.push(newIndex);
                 if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
-                if (!indexOnBoard(newIndex)) return;
                 if (board[newIndex] !== ' ') {
                     if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
                     return pMoves.push(newIndex);
@@ -163,12 +166,13 @@ const pieceMoves = (board, pIndex) => {
                 for (i = 1; i < 8; i++) {
                     let newIndex = pIndex + move * i;
                     if (!indexOnBoard(newIndex)) return;
-                    if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
-                    if (board[newIndex] !== ' ') {
+                    if (space) {
+                        if (board[newIndex] !== ' ') return pMoves.push(newIndex);
+                        pMoves.push(newIndex);
+                    } else {
                         if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
-                        return pMoves.push(newIndex);
+                        pMoves.push(newIndex);
                     }
-                    pMoves.push(newIndex);
                 }
             });
             break;
@@ -176,21 +180,25 @@ const pieceMoves = (board, pIndex) => {
             [-11, 13, 11, -13].map(move => {
                 for (i = 1; i < 8; i++) {
                     let newIndex = pIndex + move * i;
-                    if (!indexOnBoard(newIndex)) return;
-                    if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
-                    if (board[newIndex] !== ' ') {
+                    if (space) {
+                        if (board[newIndex] !== ' ') return pMoves.push(newIndex);
+                        pMoves.push(newIndex)
+                    } else {
                         if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
-                        return pMoves.push(newIndex);
+                        if (board[newIndex] !== ' ') {
+                            if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
+                            return pMoves.push(newIndex);
+                        }
+                        pMoves.push(newIndex);
                     }
-                    pMoves.push(newIndex);
                 }
             });
             break;
         } case "k": {
             [-11, 13, 11, -13, -12, 12, -1, 1].map(move => {
                 let newIndex = pIndex + move;
+                if (space) return pMoves.push(newIndex);
                 if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
-                if (!indexOnBoard(newIndex)) return;
                 if (board[newIndex] !== ' ') {
                     if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
                     return pMoves.push(newIndex);
@@ -202,7 +210,7 @@ const pieceMoves = (board, pIndex) => {
             [-12, 12, -1, 1].map(move => {
                 for (i = 1; i < 8; i++) {
                     let newIndex = pIndex + move * i;
-                    if (!indexOnBoard(newIndex)) return;
+                    if (space) return pMoves.push(newIndex);
                     if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
                     if (board[newIndex] !== ' ') {
                         if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
@@ -214,46 +222,94 @@ const pieceMoves = (board, pIndex) => {
             break;
         }
     }
-    return [...new Set(pMoves)].filter(move => indexOnBoard(move));
+    return [...new Set(pMoves)].filter(move => indexOnBoard(move)).sort((a, b) => a - b);
 }
-//Check still needs to be implemented correctly, WIP
-const pseudoLegalMoves = (board) => {
+const spaceControl = board => {
     const wSpace = [];
     const bSpace = [];
     board.map((piece, pIndex) => {
+        const pMoves = pieceMoves(board, pIndex, { space: true });
+        pieceColor(board, pIndex) == WHITE ? wSpace.push(...pMoves) : bSpace.push(...pMoves);
+    });
+    return {
+        wSpace: [...new Set(wSpace)].filter(indexOnBoard).sort((a, b) => a - b),
+        bSpace: [...new Set(bSpace)].filter(indexOnBoard).sort((a, b) => a - b),
+    }
+}
+const getMoves = board => {
+    const wMoves = [];
+    const bMoves = [];
+    board.map((piece, pIndex) => {
         if (isPiece(piece)) {
             const pMoves = pieceMoves(board, pIndex);
-            pieceColor(board, pIndex) == WHITE ? wSpace.push(...pMoves) : bSpace.push(...pMoves);
+            if (pMoves.length) pieceColor(board, pIndex) == WHITE ? wMoves.push([pIndex, pMoves]) : bMoves.push([pIndex, pMoves]);
         }
     });
     return {
-        wSpace,
-        bSpace,
+        wMoves,
+        bMoves,
     }
 }
+const applyMove = (board, pIndex, mIndex) => {
+    let b = [...board];
+    const piece = b[pIndex];
+    b[pIndex] = ' ';
+    b[mIndex] = piece;
+    return b;
+}
+const evaluate = (board) => {
+    const position = toBoard8(board);
+    let getPiecesTotal = piece => position.filter(p => p == piece).length;
+    let K = getPiecesTotal('K');
+    let Q = getPiecesTotal('Q');
+    let R = getPiecesTotal('R');
+    let B = getPiecesTotal('B');
+    let N = getPiecesTotal('N');
+    let P = getPiecesTotal('P');
 
-//Idea: create your own evaluation function!
-const MaxFunction = (moves, depth) => {
-    if (depth == 0) {
-        let val = evaluate(); // TODO: Pass arguments to evaluation function.
-        return val;
+    let k = getPiecesTotal('k');
+    let q = getPiecesTotal('q');
+    let r = getPiecesTotal('r');
+    let b = getPiecesTotal('b');
+    let n = getPiecesTotal('n');
+    let p = getPiecesTotal('p');
+    const score = 999 * (K - k) + 9 * (Q - q) + 5 * (R - r) + 3 * (B - b) + 3 * (N - n) + (P - p) + 0.2 * (spaceControl(board).wSpace.length - spaceControl(board).bSpace.length);
+    return score;
+}
+const gameOver = board => {
+    if (board.indexOf('K') == -1 || board.indexOf('k') == -1) return true;
+    return false;
+}
+const board64 = board => {
+    let display = '';
+    for (i = 0; i < board.length; i++) {
+        if (board[i] == ' ') display += '__'; else display += board[i] + board[i];
+        if ((i + 1) % 8 == 0) display += '\n';
     };
-    let max = -Infinity;
-    for (const move of moves) {
-        //TODO: Function that applies a move to a given board position
-        let score = MinFunction(moves, depth - 1);
-        if (score > max) {
-            max = score;
-        }
+    return display;
+}
+const minimax = (board, depth, isWhite) => {
+    if (depth == 0 || gameOver(board)) return evaluate(board);
+    if (isWhite) {
+        let max = -Infinity;
+        for (const [pIndex, mIndexes] of getMoves(board).wMoves) {
+            mIndexes.forEach(mIndex => {
+                const newBoard = applyMove(board, pIndex, mIndex);
+                const score = minimax(newBoard, depth - 1, false);
+                max = Math.max(max, score);
+            });
+        };
+        return max;
+    } else {
+        let min = Infinity;
+        for (const [pIndex, mIndexes] of getMoves(board).bMoves) {
+            mIndexes.forEach(mIndex => {
+                const newBoard = applyMove(board, pIndex, mIndex);
+                const score = minimax(newBoard, depth - 1, true);
+                min = Math.min(min, score);
+            });
+        };
+        return min;
     }
 }
-const MinFunction = (moves, depth) => {
-    if (depth == 0) return -evaluate();
-    let min = Infinity;
-    for (const move of moves) {
-        let score = MaxFunction(moves, depth - 1);
-        if (score < min) {
-            min = score;
-        }
-    }
-}
+const b = fromFEN(STARTING_FEN);

@@ -29,12 +29,23 @@ const applyFEN = fen => {
     if (verifyFEN(fen)) {
         const board8 = toBoard8(fromFEN(fen));
         board8.map((piece, pIndex) => {
+            overlay.children[pIndex].style.backgroundImage = '';
             if (isPiece(piece)) {
                 let resourceName = pieceColor(board8, pIndex) == WHITE ? `w${piece}` : `b${piece}`;
                 overlay.children[pIndex].style.backgroundImage = `url(/assets/${resourceName}.svg)`
             };
         });
     };
+}
+const _applyBoard = board => {
+    board.map((piece, pIndex) => {
+        // console.log(pIndex)
+        overlay.children[pIndex].style.backgroundImage = '';
+        if (isPiece(piece)) {
+            let resourceName = pieceColor(board, pIndex) == WHITE ? `w${piece}` : `b${piece}`;
+            overlay.children[pIndex].style.backgroundImage = `url(/assets/${resourceName}.svg)`
+        };
+    });
 }
 
 const main = () => {
