@@ -24,6 +24,7 @@ const toIndex8 = pIndex => {
     pIndex -= 26;
     return pIndex - Math.floor(pIndex / 12) * 4;
 }
+const toIndex12 = pIndex => pIndex + 26 + 4 * Math.floor(pIndex / 8);
 const toBoard8 = board => {
     const board8 = [];
     board.map(sq => {
@@ -96,6 +97,28 @@ const fromFEN = fen => {
     };
     return board;
 }
+const _fromBoard = (board, color) => {
+    let fen = '';
+    let count = 0;
+    let pointer = 1;
+    for (const sq of board) {
+        if (pointer > 8) {
+            if (count !== 0) fen += count;
+            count = 0;
+            fen += '/';
+            pointer = 1;
+        }
+        if (isPiece(sq)) {
+            if (count !== 0) fen += count;
+            count = 0;
+            fen += sq;
+        }
+        if (sq == ' ') count++;
+        pointer++;
+    };
+    if (count !== 0) fen += count;
+    return `${fen} ${color} - - 0 1`;
+}
 const formatFEN = fen => {
     let currentTotal = 0;
     let newFEN = '';
@@ -113,16 +136,16 @@ const formatFEN = fen => {
     newFEN += fen.slice(fen.indexOf(' '), fen.length)
     return newFEN;
 }
-const pieceLocations = (board, color) => {
-    const pieces = [];
-    board.forEach((square, sIndex) => {
-        if (!isPiece(square)) return;
-        if (color == BLACK && square == square.toUpperCase()) return;
-        if (color == WHITE && square == square.toLowerCase()) return;
-        pieces.push(sIndex);
-    });
-    return pieces;
-}
+// const pieceLocations = (board, color) => {
+//     const pieces = [];
+//     board.forEach((square, sIndex) => {
+//         if (!isPiece(square)) return;
+//         if (color == BLACK && square == square.toUpperCase()) return;
+//         if (color == WHITE && square == square.toLowerCase()) return;
+//         pieces.push(sIndex);
+//     });
+//     return pieces;
+// }
 const pieceMoves = (board, pIndex, options = { space: false }) => {
     const piece = board[pIndex];
     const pMoves = [];
@@ -171,6 +194,10 @@ const pieceMoves = (board, pIndex, options = { space: false }) => {
                         pMoves.push(newIndex);
                     } else {
                         if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
+                        if (board[newIndex] !== ' ') {
+                            if (pieceColor(board, newIndex) === pieceColor(board, pIndex)) return;
+                            return pMoves.push(newIndex);
+                        }
                         pMoves.push(newIndex);
                     }
                 }
@@ -288,28 +315,38 @@ const board64 = board => {
     };
     return display;
 }
+let n = 0;
 const minimax = (board, depth, isWhite) => {
-    if (depth == 0 || gameOver(board)) return evaluate(board);
+    n++;
+    if (depth == 0 || gameOver(board)) return [evaluate(board), []];
     if (isWhite) {
         let max = -Infinity;
+        let bestMove = [];
         for (const [pIndex, mIndexes] of getMoves(board).wMoves) {
             mIndexes.forEach(mIndex => {
                 const newBoard = applyMove(board, pIndex, mIndex);
-                const score = minimax(newBoard, depth - 1, false);
-                max = Math.max(max, score);
+                const [score, _] = minimax(newBoard, depth - 1, false);
+                if (score > max) {
+                    max = score;
+                    bestMove = [pIndex, mIndex]
+                }
             });
         };
-        return max;
+        return [max, bestMove];
     } else {
         let min = Infinity;
+        let bestMove = [];
         for (const [pIndex, mIndexes] of getMoves(board).bMoves) {
             mIndexes.forEach(mIndex => {
                 const newBoard = applyMove(board, pIndex, mIndex);
-                const score = minimax(newBoard, depth - 1, true);
-                min = Math.min(min, score);
+                const [score, _] = minimax(newBoard, depth - 1, true);
+                if (score < min) {
+                    min = score;
+                    bestMove = [pIndex, mIndex]
+                }
             });
         };
-        return min;
+        return [min, bestMove];
     }
 }
 const b = fromFEN(STARTING_FEN);
