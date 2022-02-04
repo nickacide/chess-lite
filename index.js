@@ -33,7 +33,7 @@ const applyFEN = fen => {
             overlay.children[pIndex].style.backgroundImage = '';
             if (isPiece(piece)) {
                 let resourceName = pieceColor(board8, pIndex) == WHITE ? `w${piece}` : `b${piece}`;
-                overlay.children[pIndex].style.backgroundImage = `url(/assets/${resourceName}.svg)`
+                overlay.children[pIndex].style.backgroundImage = `url(./assets/${resourceName}.svg)`
             };
         });
     };
@@ -44,7 +44,7 @@ const _applyBoard = board => {
         overlay.children[pIndex].style.backgroundImage = '';
         if (isPiece(piece)) {
             let resourceName = pieceColor(board, pIndex) == WHITE ? `w${piece}` : `b${piece}`;
-            overlay.children[pIndex].style.backgroundImage = `url(/assets/${resourceName}.svg)`
+            overlay.children[pIndex].style.backgroundImage = `url(./assets/${resourceName}.svg)`
         };
     });
 }
